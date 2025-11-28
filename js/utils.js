@@ -1,22 +1,29 @@
 // Утилиты для работы с данными
 
+let currentUserData = null;
+
 function getCurrentUser() {
-    const username = localStorage.getItem('currentUser');
-    if (!username) return null;
-    
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    return users.find(u => u.username === username);
+    return currentUserData;
 }
 
 function checkAuth() {
-    if (!getCurrentUser()) {
-        window.location.href = 'index.html';
-    }
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            const snapshot = await database.ref('users/' + user.uid).once('value');
+            currentUserData = snapshot.val();
+            if (currentUserData) {
+                currentUserData.uid = user.uid;
+            }
+        } else {
+            window.location.href = 'index.html';
+        }
+    });
 }
 
 function logout() {
-    localStorage.removeItem('currentUser');
-    window.location.href = 'index.html';
+    auth.signOut().then(() => {
+        window.location.href = 'index.html';
+    });
 }
 
 function formatDate(dateString) {
@@ -36,15 +43,17 @@ function formatDate(dateString) {
     return date.toLocaleDateString('ru-RU');
 }
 
-function getAllUsers() {
-    return JSON.parse(localStorage.getItem('users') || '[]');
+async function getAllUsers() {
+    const snapshot = await database.ref('users').once('value');
+    const users = [];
+    snapshot.forEach((child) => {
+        const user = child.val();
+        user.uid = child.key;
+        users.push(user);
+    });
+    return users;
 }
 
-function updateUser(user) {
-    const users = getAllUsers();
-    const index = users.findIndex(u => u.username === user.username);
-    if (index !== -1) {
-        users[index] = user;
-        localStorage.setItem('users', JSON.stringify(users));
-    }
+async function updateUser(user) {
+    await database.ref('users/' + user.uid).update(user);
 }

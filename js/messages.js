@@ -1,82 +1,109 @@
-// Сообщения и чаты
-
-checkAuth();
+// Сообщения и чаты с Firebase
 
 let currentChatId = null;
 let callInterval = null;
+let messagesListener = null;
 
-loadChats();
-
-const urlParams = new URLSearchParams(window.location.search);
-const chatParam = urlParams.get('chat');
-if (chatParam) {
-    openChat(chatParam);
-}
-
-function loadChats() {
-    const currentUser = getCurrentUser();
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const users = getAllUsers();
+auth.onAuthStateChanged(async (user) => {
+    if (!user) {
+        window.location.href = 'index.html';
+        return;
+    }
     
-    const userChats = chats.filter(c => c.participants.includes(currentUser.username));
+    const snapshot = await database.ref('users/' + user.uid).once('value');
+    currentUserData = snapshot.val();
+    currentUserData.uid = user.uid;
     
+    loadChats();
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    const chatParam = urlParams.get('chat');
+    if (chatParam) {
+        openChat(chatParam);
+    }
+});
+
+async function loadChats() {
+    if (!currentUserData) return;
+    
+    const chatsSnapshot = await database.ref('chats').once('value');
     const chatsList = document.getElementById('chatsList');
+    const userChats = [];
+    
+    chatsSnapshot.forEach((child) => {
+        const chat = child.val();
+        chat.id = child.key;
+        if (chat.participants && chat.participants[currentUserData.uid]) {
+            userChats.push(chat);
+        }
+    });
     
     if (userChats.length === 0) {
         chatsList.innerHTML = '<p style="color: #666;">Нет чатов</p>';
         return;
     }
     
-    chatsList.innerHTML = userChats.map(chat => {
-        const otherUsername = chat.participants.find(p => p !== currentUser.username);
-        const otherUser = users.find(u => u.username === otherUsername);
-        const lastMessage = chat.messages[chat.messages.length - 1];
-        
+    // Получаем данные других пользователей
+    const usersPromises = userChats.map(async (chat) => {
+        const otherUid = Object.keys(chat.participants).find(uid => uid !== currentUserData.uid);
+        const userSnapshot = await database.ref('users/' + otherUid).once('value');
+        return { chat, otherUser: userSnapshot.val() };
+    });
+    
+    const chatsWithUsers = await Promise.all(usersPromises);
+    
+    chatsList.innerHTML = chatsWithUsers.map(({ chat, otherUser }) => {
+        const lastMessage = chat.lastMessage || { text: 'Нет сообщений' };
         return `
             <div class="chat-item ${currentChatId === chat.id ? 'active' : ''}" onclick="openChat('${chat.id}')">
-                <strong>${otherUser ? otherUser.fullName : otherUsername}</strong>
-                <span>${lastMessage ? lastMessage.text.substring(0, 30) + '...' : 'Нет сообщений'}</span>
+                <strong>${otherUser ? otherUser.fullName : 'Пользователь'}</strong>
+                <span>${lastMessage.text.substring(0, 30)}${lastMessage.text.length > 30 ? '...' : ''}</span>
             </div>
         `;
     }).join('');
 }
 
-function openChat(chatId) {
+async function openChat(chatId) {
     currentChatId = chatId;
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const chat = chats.find(c => c.id === chatId);
+    
+    const chatSnapshot = await database.ref('chats/' + chatId).once('value');
+    const chat = chatSnapshot.val();
     
     if (!chat) return;
     
-    const currentUser = getCurrentUser();
-    const users = getAllUsers();
-    const otherUsername = chat.participants.find(p => p !== currentUser.username);
-    const otherUser = users.find(u => u.username === otherUsername);
+    const otherUid = Object.keys(chat.participants).find(uid => uid !== currentUserData.uid);
+    const otherUserSnapshot = await database.ref('users/' + otherUid).once('value');
+    const otherUser = otherUserSnapshot.val();
     
     document.getElementById('chatHeader').innerHTML = `
-        <strong>${otherUser ? otherUser.fullName : otherUsername}</strong>
-        <span style="color: #667eea; margin-left: 10px;">@${otherUsername}</span>
+        <strong>${otherUser ? otherUser.fullName : 'Пользователь'}</strong>
+        <span style="color: #667eea; margin-left: 10px;">@${otherUser ? otherUser.username : ''}</span>
     `;
     
     document.getElementById('messageInput').classList.remove('hidden');
     
-    loadMessages();
+    // Отключаем предыдущий слушатель
+    if (messagesListener) {
+        database.ref('chats/' + currentChatId + '/messages').off('value', messagesListener);
+    }
+    
+    // Слушаем сообщения в реальном времени
+    messagesListener = database.ref('chats/' + chatId + '/messages').on('value', (snapshot) => {
+        const messages = [];
+        snapshot.forEach((child) => {
+            messages.push(child.val());
+        });
+        displayMessages(messages);
+    });
+    
     loadChats();
 }
 
-function loadMessages() {
-    if (!currentChatId) return;
-    
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const chat = chats.find(c => c.id === currentChatId);
-    
-    if (!chat) return;
-    
-    const currentUser = getCurrentUser();
+function displayMessages(messages) {
     const messagesArea = document.getElementById('messagesArea');
     
-    messagesArea.innerHTML = chat.messages.map(msg => `
-        <div class="message ${msg.sender === currentUser.username ? 'sent' : 'received'}">
+    messagesArea.innerHTML = messages.map(msg => `
+        <div class="message ${msg.sender === currentUserData.uid ? 'sent' : 'received'}">
             <div>${msg.text}</div>
             <div class="message-time">${formatDate(msg.timestamp)}</div>
         </div>
@@ -85,7 +112,7 @@ function loadMessages() {
     messagesArea.scrollTop = messagesArea.scrollHeight;
 }
 
-function sendMessage() {
+async function sendMessage() {
     if (!currentChatId) return;
     
     const input = document.getElementById('newMessage');
@@ -93,24 +120,19 @@ function sendMessage() {
     
     if (!text) return;
     
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const chat = chats.find(c => c.id === currentChatId);
-    
-    if (!chat) return;
-    
-    const currentUser = getCurrentUser();
-    
-    chat.messages.push({
-        sender: currentUser.username,
+    const messageData = {
+        sender: currentUserData.uid,
         text: text,
         timestamp: new Date().toISOString()
-    });
+    };
     
-    localStorage.setItem('chats', JSON.stringify(chats));
+    // Добавляем сообщение
+    await database.ref('chats/' + currentChatId + '/messages').push(messageData);
+    
+    // Обновляем последнее сообщение
+    await database.ref('chats/' + currentChatId + '/lastMessage').set(messageData);
     
     input.value = '';
-    loadMessages();
-    loadChats();
 }
 
 document.getElementById('newMessage')?.addEventListener('keypress', function(e) {
@@ -119,16 +141,15 @@ document.getElementById('newMessage')?.addEventListener('keypress', function(e) 
     }
 });
 
-function startCall() {
+async function startCall() {
     if (!currentChatId) return;
     
-    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
-    const chat = chats.find(c => c.id === currentChatId);
-    const currentUser = getCurrentUser();
-    const users = getAllUsers();
+    const chatSnapshot = await database.ref('chats/' + currentChatId).once('value');
+    const chat = chatSnapshot.val();
     
-    const otherUsername = chat.participants.find(p => p !== currentUser.username);
-    const otherUser = users.find(u => u.username === otherUsername);
+    const otherUid = Object.keys(chat.participants).find(uid => uid !== currentUserData.uid);
+    const otherUserSnapshot = await database.ref('users/' + otherUid).once('value');
+    const otherUser = otherUserSnapshot.val();
     
     document.getElementById('callUser').textContent = `Звонок: ${otherUser.fullName}`;
     document.getElementById('callStatus').textContent = 'Соединение...';
