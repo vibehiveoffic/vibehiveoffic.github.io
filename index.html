@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VibeHive - Вход</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="auth-box">
+            <h1>Добро пожаловать в VibeHive</h1>
+            
+            <div id="loginForm" class="form-container">
+                <h2>Вход</h2>
+                <form onsubmit="login(event)">
+                    <input type="text" id="loginUsername" placeholder="Никнейм или Email" required>
+                    <input type="password" id="loginPassword" placeholder="Пароль" required>
+                    <button type="submit">Войти</button>
+                </form>
+                <p>Нет аккаунта? <a href="#" onclick="showRegister()">Зарегистрироваться</a></p>
+            </div>
+
+            <div id="registerForm" class="form-container hidden">
+                <h2>Регистрация</h2>
+                <form onsubmit="register(event)">
+                    <input type="text" id="regUsername" placeholder="Никнейм" required>
+                    <input type="email" id="regEmail" placeholder="Email" required>
+                    <input type="password" id="regPassword" placeholder="Пароль" required>
+                    <input type="text" id="regFullName" placeholder="Полное имя" required>
+                    <button type="submit">Создать аккаунт</button>
+                </form>
+                <p>Уже есть аккаунт? <a href="#" onclick="showLogin()">Войти</a></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/auth.js"></script>
+</body>
+</html>

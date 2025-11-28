@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Профиль - VibeHive</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>VibeHive</h1>
+            <div class="nav-links">
+                <a href="home.html">Главная</a>
+                <a href="search.html">Поиск</a>
+                <a href="messages.html">Сообщения</a>
+                <a href="profile.html" class="active">Профиль</a>
+                <a href="#" onclick="logout()">Выход</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="profile-container">
+            <div class="profile-header">
+                <div class="avatar">👤</div>
+                <div id="profileInfo"></div>
+            </div>
+
+            <div class="profile-edit">
+                <h2>Настройки профиля</h2>
+                <form onsubmit="updateProfile(event)">
+                    <label>Полное имя:</label>
+                    <input type="text" id="editFullName" required>
+                    
+                    <label>О себе:</label>
+                    <textarea id="editBio" rows="3"></textarea>
+                    
+                    <label>Город:</label>
+                    <input type="text" id="editCity">
+                    
+                    <label>Дата рождения:</label>
+                    <input type="date" id="editBirthday">
+                    
+                    <button type="submit">Сохранить изменения</button>
+                </form>
+            </div>
+
+            <div class="user-posts">
+                <h2>Мои посты</h2>
+                <div id="userPosts"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/profile.js"></script>
+</body>
+</html>

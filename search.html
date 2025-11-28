@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск - VibeHive</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>VibeHive</h1>
+            <div class="nav-links">
+                <a href="home.html">Главная</a>
+                <a href="search.html" class="active">Поиск</a>
+                <a href="messages.html">Сообщения</a>
+                <a href="profile.html">Профиль</a>
+                <a href="#" onclick="logout()">Выход</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="search-container">
+            <h2>Поиск пользователей</h2>
+            <input type="text" id="searchInput" placeholder="Введите никнейм..." oninput="searchUsers()">
+            
+            <div id="searchResults" class="search-results"></div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script src="js/search.js"></script>
+</body>
+</html>

@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Главная - VibeHive</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1>VibeHive</h1>
+            <div class="nav-links">
+                <a href="home.html" class="active">Главная</a>
+                <a href="search.html">Поиск</a>
+                <a href="messages.html">Сообщения</a>
+                <a href="profile.html">Профиль</a>
+                <a href="#" onclick="logout()">Выход</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="create-post">
+                <h2>Создать пост</h2>
+                <textarea id="postContent" placeholder="Что у вас нового?"></textarea>
+                <button onclick="createPost()">Опубликовать</button>
+            </div>
+
+            <div id="feed" class="feed">
+                <!-- Посты будут здесь -->
+            </div>
+        </div>
+    </div>
+
+    <script src="js/utils.js"></script>
+    <script>
+        checkAuth();
+        loadFeed();
+
+        function createPost() {
+            const content = document.getElementById('postContent').value.trim();
+            if (!content) return alert('Введите текст поста');
+
+            const user = getCurrentUser();
+            const posts = getPosts();
+            
+            posts.unshift({
+                id: Date.now(),
+                author: user.username,
+                authorName: user.fullName,
+                content: content,
+                timestamp: new Date().toISOString(),
+                likes: []
+            });
+
+            localStorage.setItem('posts', JSON.stringify(posts));
+            document.getElementById('postContent').value = '';
+            loadFeed();
+        }
+
+        function loadFeed() {
+            const posts = getPosts();
+            const feed = document.getElementById('feed');
+            const currentUser = getCurrentUser();
+
+            feed.innerHTML = posts.map(post => `
+                <div class="post">
+                    <div class="post-header">
+                        <strong>${post.authorName}</strong> <span class="username">@${post.author}</span>
+                        <span class="timestamp">${formatDate(post.timestamp)}</span>
+                    </div>
+                    <div class="post-content">${post.content}</div>
+                    <div class="post-actions">
+                        <button onclick="likePost(${post.id})" class="${post.likes.includes(currentUser.username) ? 'liked' : ''}">
+                            ❤️ ${post.likes.length}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function likePost(postId) {
+            const posts = getPosts();
+            const user = getCurrentUser();
+            const post = posts.find(p => p.id === postId);
+
+            if (post.likes.includes(user.username)) {
+                post.likes = post.likes.filter(u => u !== user.username);
+            } else {
+                post.likes.push(user.username);
+            }
+
+            localStorage.setItem('posts', JSON.stringify(posts));
+            loadFeed();
+        }
+
+        function getPosts() {
+            return JSON.parse(localStorage.getItem('posts') || '[]');
+        }
+    </script>
+</body>
+</html>
