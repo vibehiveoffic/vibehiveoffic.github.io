@@ -5,12 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Главная - VibeHive</title>
     <link rel="stylesheet" href="css/style.css">
-    
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
-    <script src="firebase.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -42,83 +36,68 @@
 
     <script src="js/utils.js"></script>
     <script>
-        auth.onAuthStateChanged(async (user) => {
-            if (!user) {
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            const snapshot = await database.ref('users/' + user.uid).once('value');
-            currentUserData = snapshot.val();
-            currentUserData.uid = user.uid;
-            
-            loadFeed();
-        });
+        checkAuth();
+        loadFeed();
 
-        async function createPost() {
+        function createPost() {
             const content = document.getElementById('postContent').value.trim();
             if (!content) return alert('Введите текст поста');
 
-            const postData = {
-                author: currentUserData.uid,
-                authorName: currentUserData.fullName,
-                authorUsername: currentUserData.username,
+            const user = getCurrentUser();
+            const posts = getPosts();
+            
+            posts.unshift({
+                id: Date.now(),
+                author: user.username,
+                authorName: user.fullName,
                 content: content,
                 timestamp: new Date().toISOString(),
-                likes: {}
-            };
+                likes: []
+            });
 
-            await database.ref('posts').push(postData);
+            localStorage.setItem('posts', JSON.stringify(posts));
             document.getElementById('postContent').value = '';
+            loadFeed();
         }
 
         function loadFeed() {
-            database.ref('posts').orderByChild('timestamp').on('value', async (snapshot) => {
-                const posts = [];
-                snapshot.forEach((child) => {
-                    const post = child.val();
-                    post.id = child.key;
-                    posts.push(post);
-                });
-                
-                posts.reverse();
-                displayPosts(posts);
-            });
-        }
-
-        function displayPosts(posts) {
+            const posts = getPosts();
             const feed = document.getElementById('feed');
-            
-            feed.innerHTML = posts.map(post => {
-                const likesCount = post.likes ? Object.keys(post.likes).length : 0;
-                const isLiked = post.likes && post.likes[currentUserData.uid];
-                
-                return `
-                    <div class="post">
-                        <div class="post-header">
-                            <strong>${post.authorName}</strong> <span class="username">@${post.authorUsername}</span>
-                            <span class="timestamp">${formatDate(post.timestamp)}</span>
-                        </div>
-                        <div class="post-content">${post.content}</div>
-                        <div class="post-actions">
-                            <button onclick="likePost('${post.id}')" class="${isLiked ? 'liked' : ''}">
-                                ❤️ ${likesCount}
-                            </button>
-                        </div>
+            const currentUser = getCurrentUser();
+
+            feed.innerHTML = posts.map(post => `
+                <div class="post">
+                    <div class="post-header">
+                        <strong>${post.authorName}</strong> <span class="username">@${post.author}</span>
+                        <span class="timestamp">${formatDate(post.timestamp)}</span>
                     </div>
-                `;
-            }).join('');
+                    <div class="post-content">${post.content}</div>
+                    <div class="post-actions">
+                        <button onclick="likePost(${post.id})" class="${post.likes.includes(currentUser.username) ? 'liked' : ''}">
+                            ❤️ ${post.likes.length}
+                        </button>
+                    </div>
+                </div>
+            `).join('');
         }
 
-        async function likePost(postId) {
-            const postRef = database.ref('posts/' + postId + '/likes/' + currentUserData.uid);
-            const snapshot = await postRef.once('value');
-            
-            if (snapshot.exists()) {
-                await postRef.remove();
+        function likePost(postId) {
+            const posts = getPosts();
+            const user = getCurrentUser();
+            const post = posts.find(p => p.id === postId);
+
+            if (post.likes.includes(user.username)) {
+                post.likes = post.likes.filter(u => u !== user.username);
             } else {
-                await postRef.set(true);
+                post.likes.push(user.username);
             }
+
+            localStorage.setItem('posts', JSON.stringify(posts));
+            loadFeed();
+        }
+
+        function getPosts() {
+            return JSON.parse(localStorage.getItem('posts') || '[]');
         }
     </script>
 </body>

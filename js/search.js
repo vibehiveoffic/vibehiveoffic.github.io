@@ -1,36 +1,21 @@
-// Поиск пользователей с Firebase
+// Поиск пользователей
 
-auth.onAuthStateChanged(async (user) => {
-    if (!user) {
-        window.location.href = 'index.html';
-        return;
-    }
-    
-    const snapshot = await database.ref('users/' + user.uid).once('value');
-    currentUserData = snapshot.val();
-    currentUserData.uid = user.uid;
-});
+checkAuth();
 
-async function searchUsers() {
+function searchUsers() {
     const query = document.getElementById('searchInput').value.trim().toLowerCase();
+    const currentUser = getCurrentUser();
+    const users = getAllUsers();
     
     if (!query) {
         document.getElementById('searchResults').innerHTML = '';
         return;
     }
     
-    const usersSnapshot = await database.ref('users').once('value');
-    const results = [];
-    
-    usersSnapshot.forEach((child) => {
-        const user = child.val();
-        user.uid = child.key;
-        
-        if (user.uid !== currentUserData.uid && 
-            user.username.toLowerCase().includes(query)) {
-            results.push(user);
-        }
-    });
+    const results = users.filter(u => 
+        u.username !== currentUser.username && 
+        u.username.toLowerCase().includes(query)
+    );
     
     const resultsContainer = document.getElementById('searchResults');
     
@@ -48,28 +33,25 @@ async function searchUsers() {
                     <p>@${user.username}</p>
                 </div>
             </div>
-            <button onclick="startChat('${user.uid}')">Написать</button>
+            <button onclick="startChat('${user.username}')">Написать</button>
         </div>
     `).join('');
 }
 
-async function startChat(otherUid) {
-    // Создаем ID чата из отсортированных UID
-    const chatId = [currentUserData.uid, otherUid].sort().join('_');
+function startChat(username) {
+    const chats = JSON.parse(localStorage.getItem('chats') || '[]');
+    const currentUser = getCurrentUser();
     
-    // Проверяем существование чата
-    const chatSnapshot = await database.ref('chats/' + chatId).once('value');
+    const chatId = [currentUser.username, username].sort().join('_');
     
-    if (!chatSnapshot.exists()) {
-        // Создаем новый чат
-        await database.ref('chats/' + chatId).set({
-            participants: {
-                [currentUserData.uid]: true,
-                [otherUid]: true
-            },
-            createdAt: new Date().toISOString(),
-            messages: {}
+    if (!chats.find(c => c.id === chatId)) {
+        chats.push({
+            id: chatId,
+            participants: [currentUser.username, username],
+            messages: [],
+            createdAt: new Date().toISOString()
         });
+        localStorage.setItem('chats', JSON.stringify(chats));
     }
     
     window.location.href = `messages.html?chat=${chatId}`;
